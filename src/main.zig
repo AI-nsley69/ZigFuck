@@ -34,7 +34,6 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
                 mem_cells[ptr] -%= 1;
             },
             '.' => {
-                // // std.debug.print("{}, ", .{mem_cells[ptr]});
                 try output.writeByte(mem_cells[ptr]);
             },
             ',' => {
@@ -59,7 +58,7 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
             ']' => {
                 if (mem_cells[ptr] >= 0) {
                     var depth: usize = 0;
-                    while (i > 0) : (i -= 1) {
+                    while (true) : (i -= 1) {
                         switch (src[i]) {
                             ']' => depth += 1,
                             '[' => if (depth == 0) {
@@ -69,6 +68,7 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
                             },
                             else => {},
                         }
+                        if (i == 0) break;
                     }
                 }
             },
