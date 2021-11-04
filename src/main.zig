@@ -17,12 +17,17 @@ pub fn input(allocator: *std.mem.Allocator) ![]u8 {
     
     var args = std.process.args();
     std.debug.assert(args.skip());
-    
+
     const file = try args.next(allocator) orelse {
         try output.writeAll("Have you given me no file?\n");
-        return undefined;
+        return error.MissingArguments;
     };
-
+    defer allocator.free(file);
+    
+    if (!std.mem.endsWith(u8, file, ".bf")) {
+        try output.writeAll("Have you given me the wrong file?");
+        return error.InvalidFilename;
+    }
     var src = try std.fs.cwd().readFileAlloc(allocator, file, 10 << 20);
 
     return src;
