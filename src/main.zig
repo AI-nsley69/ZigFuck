@@ -8,6 +8,7 @@ pub fn main() anyerror!void {
     //const src = try std.fs.cwd().readFileAlloc(allocator, "code.bf", 10 << 20);
     //defer allocator.free(src);
     const src = try input(allocator);
+    defer allocator.free(src);
     try interpret(allocator, src);
 }
 
@@ -23,7 +24,6 @@ pub fn input(allocator: *std.mem.Allocator) ![]u8 {
     };
 
     var src = try std.fs.cwd().readFileAlloc(allocator, file, 10 << 20);
-    defer allocator.free(src);
 
     return src;
 }
