@@ -5,8 +5,6 @@ pub fn main() anyerror!void {
     defer std.debug.assert(!gpa.deinit());
     const allocator = &gpa.allocator;
 
-    //const src = try std.fs.cwd().readFileAlloc(allocator, "code.bf", 10 << 20);
-    //defer allocator.free(src);
     const src = try input(allocator);
     defer allocator.free(src);
     try interpret(allocator, src);
