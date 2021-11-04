@@ -12,7 +12,7 @@ pub fn main() anyerror!void {
 
 pub fn input(allocator: *std.mem.Allocator) ![]u8 {
     const output = std.io.getStdOut().writer();
-    
+
     var args = std.process.args();
     std.debug.assert(args.skip());
 
@@ -21,7 +21,7 @@ pub fn input(allocator: *std.mem.Allocator) ![]u8 {
         return error.MissingArguments;
     };
     defer allocator.free(file);
-    
+
     if (!std.mem.endsWith(u8, file, ".bf")) {
         try output.writeAll("Have you given me the wrong file?");
         return error.InvalidFilename;
@@ -36,6 +36,8 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
     const mem_cells = try allocator.alloc(u8, 1 << 16);
     defer allocator.free(mem_cells);
     std.mem.set(u8, mem_cells, 0);
+    var stack = std.ArrayList(usize).init(allocator);
+    defer stack.deinit();
     var ptr: u16 = 5;
     var i: usize = 0;
     while (i < src.len) : (i += 1) {
@@ -58,38 +60,26 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
             ',' => {
                 mem_cells[ptr] = try std.io.getStdIn().reader().readByte();
             },
-            '[' => {
-                if (mem_cells[ptr] == 0) {
-                    var depth: usize = 0;
-                    while (i < src.len) : (i += 1) {
-                        switch (src[i]) {
-                            '[' => depth += 1,
-                            ']' => if (depth == 1) {
-                                break;
-                            } else {
-                                depth -= 1;
-                            },
-                            else => {},
-                        }
+            '[' => if (mem_cells[ptr] != 0) {
+                try stack.append(i);
+            } else {
+                var depth: usize = 0;
+                while (i < src.len) : (i += 1) {
+                    switch (src[i]) {
+                        '[' => depth += 1,
+                        ']' => if (depth == 1) {
+                            break;
+                        } else {
+                            depth -= 1;
+                        },
+                        else => {},
                     }
                 }
             },
-            ']' => {
-                if (mem_cells[ptr] != 0) {
-                    var depth: usize = 0;
-                    while (true) : (i -= 1) {
-                        switch (src[i]) {
-                            ']' => depth += 1,
-                            '[' => if (depth == 1) {
-                                break;
-                            } else {
-                                depth -= 1;
-                            },
-                            else => {},
-                        }
-                        if (i == 0) break;
-                    }
-                }
+            ']' => if (mem_cells[ptr] != 0) {
+                i = stack.items[stack.items.len - 1];
+            } else {
+                _ = stack.pop();
             },
             else => {},
         }
