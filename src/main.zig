@@ -19,7 +19,6 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
     var ptr: u16 = 0;
     var i: usize = 0;
     while (i < src.len) : (i += 1) {
-        std.debug.print("{} ", .{i});
         switch (src[i]) {
             '>' => {
                 ptr +%= 1;
@@ -56,8 +55,8 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
                 }
             },
             ']' => {
-                if (mem_cells[ptr] >= 0) {
-                    var depth: usize = 0;
+                if (mem_cells[ptr] != 0) {
+                    var depth: i16 = -1;
                     while (true) : (i -= 1) {
                         switch (src[i]) {
                             ']' => depth += 1,
