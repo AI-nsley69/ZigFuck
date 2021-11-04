@@ -5,10 +5,27 @@ pub fn main() anyerror!void {
     defer std.debug.assert(!gpa.deinit());
     const allocator = &gpa.allocator;
 
-    const src = try std.fs.cwd().readFileAlloc(allocator, "code.bf", 10 << 20);
+    //const src = try std.fs.cwd().readFileAlloc(allocator, "code.bf", 10 << 20);
+    //defer allocator.free(src);
+    const src = try input(allocator);
+    try interpret(allocator, src);
+}
+
+pub fn input(allocator: *std.mem.Allocator) ![]u8 {
+    const output = std.io.getStdOut().writer();
+    
+    var args = std.process.args();
+    std.debug.assert(args.skip());
+    
+    const file = try args.next(allocator) orelse {
+        try output.writeAll("Have you given me no file?\n");
+        return undefined;
+    };
+
+    var src = try std.fs.cwd().readFileAlloc(allocator, file, 10 << 20);
     defer allocator.free(src);
 
-    try interpret(allocator, src);
+    return src;
 }
 
 pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
@@ -16,7 +33,7 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
     const mem_cells = try allocator.alloc(u8, 1 << 16);
     defer allocator.free(mem_cells);
     std.mem.set(u8, mem_cells, 0);
-    var ptr: u16 = 0;
+    var ptr: u16 = 5;
     var i: usize = 0;
     while (i < src.len) : (i += 1) {
         switch (src[i]) {
@@ -44,7 +61,7 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
                     while (i < src.len) : (i += 1) {
                         switch (src[i]) {
                             '[' => depth += 1,
-                            ']' => if (depth == 0) {
+                            ']' => if (depth == 1) {
                                 break;
                             } else {
                                 depth -= 1;
@@ -56,11 +73,11 @@ pub fn interpret(allocator: *std.mem.Allocator, src: []u8) !void {
             },
             ']' => {
                 if (mem_cells[ptr] != 0) {
-                    var depth: i16 = -1;
+                    var depth: usize = 0;
                     while (true) : (i -= 1) {
                         switch (src[i]) {
                             ']' => depth += 1,
-                            '[' => if (depth == 0) {
+                            '[' => if (depth == 1) {
                                 break;
                             } else {
                                 depth -= 1;
