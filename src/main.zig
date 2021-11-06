@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub fn main() anyerror!void {
+    // Allocator for memory
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(!gpa.deinit());
     const allocator = &gpa.allocator;
