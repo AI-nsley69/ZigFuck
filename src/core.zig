@@ -31,108 +31,61 @@ test "Tokenize basic source" {
     try testing.expect(tokens.len == 106);
 }
 
-const NodeTag = enum {
-    add,
-    move,
-    out,
-    in,
-    loop,
-};
-
 const Node = struct {
-    action: NodeTag,
+    tag: enum {
+        add,
+        move,
+        out,
+        in,
+        loop,
+    },
     value: union {
         add: i9,
         move: i32,
-        none: i0,
-        loop: *const Nodes,
+        none: void,
+        loop: usize,
     },
 };
 
-const Nodes = std.MultiArrayList(Node);
+pub const Nodes = std.MultiArrayList(Node);
+pub const LoopNodes = std.ArrayList(Nodes.Slice);
 
-pub fn parse(alloc: std.mem.Allocator, tokens: []const Token) !Nodes {
+pub fn parse(alloc: std.mem.Allocator, tokens: []const Token, loop_nodes: *LoopNodes) !Nodes {
     var nodes = Nodes{};
-    defer alloc.free(nodes);
 
     var i: u32 = 0;
     while (i < tokens.len) {
-        var current = tokens[i];
-
-        switch (current) {
-            .add, .subtract => {
-                var node = Node{
-                    .action = .add,
-                    .value = .{ .add = 0 },
-                };
-                i += 1;
-                while (i < tokens.len) {
-                    current = tokens[i];
-                    if (current == .add) {
-                        node.value.add +%= 1;
-                    } else if (current == .subtract) {
-                        node.value.add -%= 1;
-                    } else {
-                        break;
-                    }
-                    i += 1;
-                }
-
-                try nodes.append(alloc, node);
-            },
-            .move_l, .move_r => {
-                var node = Node{
-                    .action = .add,
-                    .value = .{ .move = 0 },
-                };
-                i += 1;
-                while (i < tokens.len) {
-                    current = tokens[i];
-                    if (current == .move_r) {
-                        node.value.move +%= 1;
-                    } else if (current == .move_l) {
-                        node.value.move -%= 1;
-                    } else {
-                        break;
-                    }
-                    i += 1;
-                }
-
-                try nodes.append(alloc, node);
-            },
-            .in => try nodes.append(alloc, Node{
-                .action = .in,
-                .value = .{ .none = 0 },
-            }),
-            .out => try nodes.append(alloc, Node{
-                .action = .out,
-                .value = .{ .none = 0 },
-            }),
+        const token = tokens[i];
+        switch (token) {
+            .add => try nodes.append(alloc, Node{ .tag = .add, .value = .{ .add = 1 } }),
+            .subtract => try nodes.append(alloc, Node{ .tag = .add, .value = .{ .add = -1 } }),
+            .move_r => try nodes.append(alloc, Node{ .tag = .move, .value = .{ .move = 1 } }),
+            .move_l => try nodes.append(alloc, Node{ .tag = .move, .value = .{ .move = -1 } }),
+            .in => try nodes.append(alloc, Node{ .tag = .in, .value = .{ .none = @as(void, undefined) } }),
+            .out => try nodes.append(alloc, Node{ .tag = .out, .value = .{ .none = @as(void, undefined) } }),
             .start_loop => {
-                var loop_tokens = std.ArrayList(Token).init(alloc);
-                defer loop_tokens.deinit();
-                i += 1;
-                var depth: u8 = 1;
-                while (depth != 0) {
-                    current = tokens[i];
+                const start = i + 1;
+                var end = start;
+                var depth: u32 = 1;
+                while (depth > 0 and end < tokens.len) {
+                    const current = tokens[end];
                     if (current == .start_loop) {
                         depth += 1;
                     }
                     if (current == .end_loop) {
                         depth -= 1;
                     }
-
-                    try loop_tokens.append(current);
+                    end += 1;
                 }
 
-                const loop_tokens_slice = try loop_tokens.toOwnedSlice();
-                const loop_nodes = try parse(alloc, loop_tokens_slice);
-                try nodes.append(alloc, Node{ .action = .loop, .value = .{
-                    .loop = &loop_nodes,
-                } });
+                var local_nodes = try parse(alloc, tokens[start .. end - 1], loop_nodes);
+                try loop_nodes.append(local_nodes.toOwnedSlice());
+                try nodes.append(alloc, Node{ .tag = .loop, .value = .{ .loop = loop_nodes.items.len - 1 } });
+                i = end + 1;
             },
-            else => break,
+            else => continue,
         }
+        i += 1;
     }
 
     return nodes;
@@ -145,8 +98,18 @@ test "Test parser" {
     const tokens = try tokenize(alloc, source);
     defer alloc.free(tokens);
 
-    var nodes = try parse(alloc, tokens);
+    var loop_nodes = LoopNodes.init(alloc);
+    defer {
+        for (loop_nodes.items) |loop| {
+            alloc.free(loop);
+        }
+
+        loop_nodes.deinit();
+    }
+
+    var nodes = try parse(alloc, tokens, &loop_nodes);
     defer nodes.deinit(alloc);
 
-    try testing.expect(nodes.len == 31);
+    std.debug.print("Len of nodes: {}\n", .{nodes.len});
+    try testing.expect(nodes.len == 64);
 }
