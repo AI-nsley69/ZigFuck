@@ -70,7 +70,7 @@ test "Test parser" {
         while (i < nodes.len) : (i += 1) {
             const item = nodes.get(i);
             if (item.tag != .loop) continue;
-            item.value.loop.*.deinit(alloc);
+            item.value.loop.deinit(alloc);
         }
         nodes.deinit(alloc);
     }
