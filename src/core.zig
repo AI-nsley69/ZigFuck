@@ -48,6 +48,7 @@ pub fn parse(alloc: std.mem.Allocator, tokens: []const u8) !Nodes {
                 }
 
                 var local_nodes = try parse(alloc, tokens[start..end]);
+                // std.debug.print("Local nodes size: {}\n", .{local_nodes.len});
                 try nodes.append(alloc, Node{ .tag = .loop, .value = .{ .loop = &local_nodes } });
                 i = end;
             },
@@ -59,21 +60,27 @@ pub fn parse(alloc: std.mem.Allocator, tokens: []const u8) !Nodes {
     return nodes;
 }
 
+pub fn deinitNodes(alloc: std.mem.Allocator, nodes: *Nodes) void {
+    // const new_nodes = nodes.*;
+    std.debug.print("Nodes: {}\n", .{nodes.len});
+    const tags = nodes.items(.tag);
+    for (tags, 0..) |tag, index| {
+        if (tag != .loop) continue;
+        // std.debug.print("Len: {}, index: {}\n", .{ nodes.len, index });
+        const node = nodes.get(index);
+        deinitNodes(alloc, node.value.loop);
+    }
+    nodes.deinit(alloc);
+}
+
 test "Test parser" {
     const alloc = testing.allocator;
 
     const source: []const u8 = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++. bla bla bla";
 
     var nodes = try parse(alloc, source);
-    defer {
-        var i: u32 = 0;
-        while (i < nodes.len) : (i += 1) {
-            const item = nodes.get(i);
-            if (item.tag != .loop) continue;
-            item.value.loop.deinit(alloc);
-        }
-        nodes.deinit(alloc);
-    }
+    // defer nodes.deinit(alloc);
+    defer deinitNodes(alloc, &nodes);
 
     std.debug.print("Len of nodes: {}\n", .{nodes.len});
     try testing.expect(nodes.len == 66);
